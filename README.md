@@ -1,18 +1,53 @@
-# Deobfuscator Web
+<div align="center">
+  <h1>🛡️ Deobfuscator Web</h1>
+  <p><strong>Paste obfuscated PowerShell, VBA, or JavaScript → get clean readable code + IOCs + detection rules</strong></p>
 
-[![Live Site](https://img.shields.io/badge/LIVE-https%3A%2F%2Fdeobfuscator--web.onrender.com-58a6ff?style=for-the-badge)](https://deobfuscator-web.onrender.com)
-[![ko-fi](https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/gnaixnaij)
-
-**Paste or upload obfuscated PowerShell, VBA, and JavaScript — get clean readable output instantly.**
-
-👉 **https://deobfuscator-web.onrender.com** 👈
+  <a href="https://deobfuscator-web.onrender.com/">
+    <img src="https://img.shields.io/badge/LIVE-deobfuscator--web.onrender.com-58a6ff?style=for-the-badge" alt="Live Site">
+  </a>
+  <a href="https://ko-fi.com/gnaixnaij">
+    <img src="https://img.shields.io/badge/Sponsor-Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi" alt="Sponsor">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License">
+  </a>
+</div>
 
 ---
 
-## Run locally
+## ✨ Features
+
+| Feature | Description |
+|---------|-------------|
+| 🔓 **Deobfuscate** | Strip layers from PowerShell, VBA, and JavaScript |
+| 🔍 **IOC Extraction** | Automatically extract IPs, domains, URLs, hashes, registry keys |
+| 🎯 **Sigma Rules** | Ready-to-paste SIEM detection rules |
+| 📄 **YARA Rules** | File scanning rules from extracted IOCs |
+| 📦 **Batch Upload** | Up to 20 files at once for triage |
+| 🧠 **LLM Mode** | Optional OpenAI integration for deeper analysis |
+
+## 🚀 Try it now
+
+👉 **https://deobfuscator-web.onrender.com** 👈
+
+## 🖥 Run locally
 
 ```bash
+git clone git@github.com:gnaixnaij/deobfuscator-web.git
+cd deobfuscator-web
 pip install -r requirements.txt
 python app.py
 # Open http://localhost:5000
 ```
+
+## 🤝 Contribute
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). PRs welcome — especially new deobfuscation techniques.
+
+## ⚠️ Disclaimer
+
+This tool is for authorized security testing and education only. See [DISCLAIMER.md](DISCLAIMER.md).
+
+## ☕ Support
+
+If this saves you time in your work, [buy me a coffee](https://ko-fi.com/gnaixnaij). It keeps the project improving.
