@@ -107,7 +107,11 @@ def analyze_iocs():
     sigma_rules = generate_sigma(iocs)
     yara_rule = generate_yara(iocs)
 
-    has_iocs = any(v for k, v in iocs.items() if k != "base64_strings" for v in (v if isinstance(v, list) else v.values()))
+    has_iocs = bool(
+        iocs.get("urls") or iocs.get("domains") or iocs.get("ips") or
+        iocs.get("emails") or iocs.get("filepaths") or iocs.get("registry_keys") or
+        any(iocs.get("hashes", {}).values())
+    )
 
     return jsonify({
         "iocs": iocs,
@@ -150,10 +154,13 @@ def analyze_batch():
         changed = deobfuscated.strip() != script.strip()
 
         iocs = extract_iocs(deobfuscated or script)
-        ioc_count = sum(
-            len(v) if isinstance(v, list) else sum(v.values()) if isinstance(v, dict) else 0
-            for v in iocs.values()
-        )
+        ioc_count = 0
+        for v in iocs.values():
+            if isinstance(v, list):
+                ioc_count += len(v)
+            elif isinstance(v, dict):
+                for sublist in v.values():
+                    ioc_count += len(sublist)
 
         results.append({
             "filename": f.filename,
