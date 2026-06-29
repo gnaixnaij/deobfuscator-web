@@ -46,15 +46,26 @@
       </div>
 
       <div class="tab-content" id="tab-upload">
+        <div class="upload-mode-toggle">
+          <button class="mode-btn active" data-mode="single" onclick="switchUploadMode('single')">Single file</button>
+          <button class="mode-btn" data-mode="batch" onclick="switchUploadMode('batch')">Batch (up to 20)</button>
+        </div>
+
         <div class="drop-zone" id="drop-zone">
-          <div class="drop-icon">📂</div>
-          <p>Drag & drop a file here</p>
-          <p class="drop-hint">or click to browse — .ps1, .bas, .vbs, .js</p>
+          <div class="drop-icon" id="drop-icon">📂</div>
+          <p id="drop-text">Drag & drop a file here</p>
+          <p class="drop-hint" id="drop-hint">or click to browse — .ps1, .bas, .vbs, .js</p>
           <input type="file" id="file-input" accept=".ps1,.bas,.vbs,.js,.txt" hidden>
         </div>
+
         <div class="file-info" id="file-info" hidden>
           <span>📄 <span id="file-name"></span></span>
           <span class="lang-badge" id="upload-lang"></span>
+        </div>
+
+        <div class="batch-preview" id="batch-preview" hidden>
+          <h4>Files selected (<span id="batch-count">0</span>)</h4>
+          <div id="batch-list"></div>
         </div>
       </div>
 
@@ -66,6 +77,9 @@
         </label>
         <button class="btn-primary" id="deobfuscate-btn" onclick="deobfuscate()">
           ⚡ Deobfuscate
+        </button>
+        <button class="btn-primary" id="batch-btn" onclick="analyzeBatch()" hidden>
+          📊 Batch analyze
         </button>
       </div>
     </div>
@@ -123,6 +137,40 @@
         </div>
         <div id="detection-content"></div>
       </div>
+
+      <!-- Batch results -->
+      <div class="result-card" id="batch-results" hidden>
+        <div class="result-card-header">
+          <h3>📊 Batch Results</h3>
+          <span class="steps-count" id="batch-status"></span>
+        </div>
+        <div id="batch-table-wrapper">
+          <table class="batch-table" id="batch-table">
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>Lang</th>
+                <th>Size</th>
+                <th>Deobfuscated</th>
+                <th>IOCs</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="batch-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Batch detail modal -->
+      <div class="modal-overlay" id="batch-modal" hidden onclick="closeBatchModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <h3 id="modal-filename"></h3>
+            <button class="btn-secondary" onclick="closeBatchModal()">✕</button>
+          </div>
+          <pre class="code-output" id="modal-output"></pre>
+        </div>
+      </div>
     </div>
   </main>
 
@@ -132,6 +180,8 @@
 
   <script>
     let currentFile = null;
+    let uploadMode = "single";
+    let batchFiles = [];
     let originalText = "";
     let deobfuscatedText = "";
 
@@ -144,6 +194,29 @@
         document.getElementById("tab-" + tab.dataset.tab).classList.add("active");
       });
     });
+
+    // Upload mode switching
+    function switchUploadMode(mode) {
+      uploadMode = mode;
+      document.querySelectorAll(".mode-btn").forEach(b => b.classList.remove("active"));
+      document.querySelector(`.mode-btn[data-mode="${mode}"]`).classList.add("active");
+      document.getElementById("file-input").multiple = (mode === "batch");
+      document.getElementById("batch-preview").hidden = true;
+      document.getElementById("file-info").hidden = true;
+      document.getElementById("batch-btn").hidden = true;
+      document.getElementById("deobfuscate-btn").hidden = false;
+      currentFile = null;
+      batchFiles = [];
+      if (mode === "batch") {
+        document.getElementById("drop-text").textContent = "Drag & drop multiple files here";
+        document.getElementById("drop-hint").textContent = "or click to browse — up to 20 files";
+        document.getElementById("drop-icon").textContent = "📦";
+      } else {
+        document.getElementById("drop-text").textContent = "Drag & drop a file here";
+        document.getElementById("drop-hint").textContent = "or click to browse — .ps1, .bas, .vbs, .js";
+        document.getElementById("drop-icon").textContent = "📂";
+      }
+    }
 
     // File upload via click
     document.getElementById("drop-zone").addEventListener("click", () => {
@@ -162,21 +235,136 @@
     dropZone.addEventListener("drop", e => {
       e.preventDefault();
       dropZone.classList.remove("dragover");
-      if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+      if (e.dataTransfer.files.length) {
+        if (uploadMode === "batch") {
+          handleBatchFiles(e.dataTransfer.files);
+        } else {
+          handleFile(e.dataTransfer.files[0]);
+        }
+      }
     });
 
     document.getElementById("file-input").addEventListener("change", e => {
-      if (e.target.files.length) handleFile(e.target.files[0]);
+      if (e.target.files.length) {
+        if (uploadMode === "batch") {
+          handleBatchFiles(e.target.files);
+        } else {
+          handleFile(e.target.files[0]);
+        }
+      }
     });
 
     function handleFile(file) {
       currentFile = file;
+      batchFiles = [];
       document.getElementById("file-name").textContent = file.name;
       document.getElementById("file-info").hidden = false;
+      document.getElementById("batch-preview").hidden = true;
       const ext = file.name.split(".").pop().toLowerCase();
       const langMap = { ps1: "PowerShell", bas: "VBA", vbs: "VBA", js: "JavaScript" };
       document.getElementById("upload-lang").textContent = langMap[ext] || "Unknown";
+      document.getElementById("batch-btn").hidden = true;
+      document.getElementById("deobfuscate-btn").hidden = false;
     }
+
+    function handleBatchFiles(fileList) {
+      batchFiles = [];
+      for (let f of fileList) {
+        if (batchFiles.length >= 20) break;
+        const ext = f.name.split(".").pop().toLowerCase();
+        if (["ps1","bas","vbs","js","txt"].includes(ext)) {
+          batchFiles.push(f);
+        }
+      }
+      document.getElementById("file-info").hidden = true;
+      document.getElementById("batch-count").textContent = batchFiles.length;
+      const list = document.getElementById("batch-list");
+      list.innerHTML = batchFiles.map(f => {
+        const ext = f.name.split(".").pop().toLowerCase();
+        const langMap = { ps1: "PowerShell", bas: "VBA", vbs: "VBA", js: "JavaScript" };
+        return `<div class="batch-file-row"><span>📄 ${f.name}</span><span class="lang-badge">${langMap[ext] || "?"}</span></div>`;
+      }).join("");
+      document.getElementById("batch-preview").hidden = false;
+      document.getElementById("batch-btn").hidden = batchFiles.length === 0;
+      document.getElementById("deobfuscate-btn").hidden = true;
+    }
+
+    async function analyzeBatch() {
+      if (!batchFiles.length) return;
+      const btn = document.getElementById("batch-btn");
+      btn.disabled = true;
+      btn.textContent = "⏳ Analyzing...";
+      document.getElementById("batch-results").hidden = true;
+
+      const formData = new FormData();
+      batchFiles.forEach(f => formData.append("files", f));
+
+      try {
+        const r = await fetch("/api/analyze-batch", { method: "POST", body: formData });
+        const d = await r.json();
+        renderBatchResults(d);
+      } catch (err) {
+        showError("Batch analysis failed: " + err.message);
+      }
+
+      btn.disabled = false;
+      btn.textContent = "📊 Batch analyze";
+    }
+
+    function renderBatchResults(d) {
+      document.getElementById("batch-results").hidden = false;
+      document.getElementById("batch-status").textContent = d.total + " files";
+      const tbody = document.getElementById("batch-tbody");
+      tbody.innerHTML = "";
+      d.results.forEach((r, i) => {
+        const tr = document.createElement("tr");
+        const langClass = (r.language || "").toLowerCase();
+        const snippet = (r.deobfuscated || "").slice(0, 120).replace(/\n/g, " ") || (r.error || "—");
+        tr.innerHTML = `
+          <td class="cell-filename">${r.filename}</td>
+          <td><span class="lang-badge ${langClass}">${r.language}</span></td>
+          <td class="cell-size">${r.size}</td>
+          <td class="cell-snippet">${escapeHtml(snippet)}</td>
+          <td class="cell-iocs">${r.ioc_count || 0}</td>
+          <td><button class="btn-secondary" onclick="showBatchDetail(${i})">View</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+      document.getElementById("batch-results").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    const batchResultsData = [];
+    async function showBatchDetail(idx) {
+      const r = batchResultsData.length ? batchResultsData[idx] : null;
+      if (!r) return;
+      document.getElementById("modal-filename").textContent = r.filename;
+      document.getElementById("modal-output").textContent = r.deobfuscated || "(No deobfuscated output)";
+      document.getElementById("batch-modal").hidden = false;
+    }
+
+    function closeBatchModal(e) {
+      if (!e || e.target === e.currentTarget || !e) {
+        document.getElementById("batch-modal").hidden = true;
+      }
+    }
+
+    // Store batch results for modal
+    const origFetch = window.fetch;
+    window.fetch = function() {
+      return origFetch.apply(this, arguments).then(r => {
+        const ct = r.headers.get("content-type") || "";
+        if (ct.includes("json")) {
+          const clone = r.clone();
+          clone.json().then(d => {
+            if (d.results) {
+              batchResultsData.length = 0;
+              batchResultsData.push(...d.results);
+            }
+          }).catch(() => {});
+        }
+        return r;
+      });
+    };
 
     // Paste area also accepts drag/drop
     const codeInput = document.getElementById("code-input");
@@ -226,7 +414,9 @@
     function clearEditor() {
       codeInput.value = "";
       currentFile = null;
+      batchFiles = [];
       document.getElementById("file-info").hidden = true;
+      document.getElementById("batch-preview").hidden = true;
       document.getElementById("output-section").hidden = true;
       document.getElementById("detected-lang").textContent = "Auto-detect";
     }

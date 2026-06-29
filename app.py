@@ -8,7 +8,7 @@ from ioc.sigma import generate_sigma
 from ioc.yara import generate_yara
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # 20MB for batch
 
 LANG_MAP = {
     "powershell": "powershell",
@@ -115,6 +115,57 @@ def analyze_iocs():
         "sigma_rules": [{"title": t, "rule": r} for t, r in sigma_rules],
         "yara_rule": yara_rule,
     })
+
+
+@app.route("/api/analyze-batch", methods=["POST"])
+def analyze_batch():
+    if "files" not in request.files:
+        return jsonify({"error": "No files uploaded"}), 400
+
+    files = request.files.getlist("files")
+    if not files or all(f.filename == "" for f in files):
+        return jsonify({"error": "No files selected"}), 400
+
+    results = []
+    for f in files[:20]:
+        if f.filename == "":
+            continue
+        try:
+            script = f.read().decode("utf-8", errors="replace")
+        except Exception:
+            results.append({"filename": f.filename, "error": "Could not read file"})
+            continue
+
+        if not script.strip():
+            results.append({"filename": f.filename, "error": "Empty file"})
+            continue
+
+        ext = os.path.splitext(f.filename)[1].lstrip(".").lower()
+        lang = LANG_MAP.get(ext, detect_language(script))
+        if lang == "unknown":
+            lang = "powershell"
+
+        deobf_result = analyze(script, lang=lang)
+        deobfuscated = deobf_result.get("deobfuscated", "")
+        changed = deobfuscated.strip() != script.strip()
+
+        iocs = extract_iocs(deobfuscated or script)
+        ioc_count = sum(
+            len(v) if isinstance(v, list) else sum(v.values()) if isinstance(v, dict) else 0
+            for v in iocs.values()
+        )
+
+        results.append({
+            "filename": f.filename,
+            "language": lang,
+            "size": len(script),
+            "deobfuscated": deobfuscated[:500] if deobfuscated else "",
+            "changed": changed,
+            "ioc_count": ioc_count,
+            "error": None,
+        })
+
+    return jsonify({"results": results, "total": len(results)})
 
 
 if __name__ == "__main__":
