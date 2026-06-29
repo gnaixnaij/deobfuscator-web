@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d1117"/>
+      <stop offset="100%" style="stop-color:#161b22"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <text x="80" y="220" font-family="Inter, Arial, sans-serif" font-size="72" font-weight="700" fill="#e6edf3">Deobfuscator</text>
+  <text x="80" y="290" font-family="Inter, Arial, sans-serif" font-size="32" font-weight="400" fill="#8b949e">Paste obfuscated malware scripts → get clean code</text>
+  <rect x="80" y="330" rx="8" width="400" height="60" fill="#1c2333" stroke="#30363d" stroke-width="1"/>
+  <text x="100" y="368" font-family="Inter, Arial, sans-serif" font-size="20" fill="#58a6ff">PowerShell · VBA · JavaScript</text>
+  <rect x="520" y="330" rx="8" width="200" height="60" fill="#238636"/>
+  <text x="545" y="368" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="600" fill="#fff">IOCs</text>
+  <rect x="760" y="330" rx="8" width="200" height="60" fill="#1f6feb"/>
+  <text x="785" y="368" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="600" fill="#fff">Sigma</text>
+  <rect x="1000" y="330" rx="8" width="150" height="60" fill="#8250df"/>
+  <text x="1025" y="368" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="600" fill="#fff">YARA</text>
+  <text x="80" y="520" font-family="Inter, Arial, sans-serif" font-size="24" fill="#3fb950">deobfuscator-web.onrender.com</text>
+</svg>
