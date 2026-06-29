@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deobfuscator — AI-Powered Script Deobfuscation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <h1>🛡️ Deobfuscator</h1>
+      <p class="subtitle">Deobfuscate PowerShell, VBA, and JavaScript in your browser</p>
+    </div>
+    <div class="header-actions">
+      <a href="https://ko-fi.com/gnaixnaij" target="_blank" class="ko-fi-btn">☕ Sponsor</a>
+      <a href="https://github.com/gnaixnaij/deobfuscator" target="_blank" class="gh-btn">GitHub</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="input-section">
+      <div class="input-tabs">
+        <button class="tab active" data-tab="paste">Paste code</button>
+        <button class="tab" data-tab="upload">Upload file</button>
+      </div>
+
+      <div class="tab-content active" id="tab-paste">
+        <div class="editor-wrapper">
+          <div class="editor-header">
+            <span class="lang-badge" id="detected-lang">Auto-detect</span>
+            <div class="editor-actions">
+              <select id="lang-override">
+                <option value="">Auto-detect</option>
+                <option value="powershell">PowerShell</option>
+                <option value="vba">VBA</option>
+                <option value="javascript">JavaScript</option>
+              </select>
+              <button class="btn-secondary" onclick="clearEditor()">Clear</button>
+            </div>
+          </div>
+          <textarea id="code-input" placeholder="Paste your obfuscated script here...&#10;&#10;Or drag & drop a .ps1, .bas, or .js file onto this area."></textarea>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-upload">
+        <div class="drop-zone" id="drop-zone">
+          <div class="drop-icon">📂</div>
+          <p>Drag & drop a file here</p>
+          <p class="drop-hint">or click to browse — .ps1, .bas, .vbs, .js</p>
+          <input type="file" id="file-input" accept=".ps1,.bas,.vbs,.js,.txt" hidden>
+        </div>
+        <div class="file-info" id="file-info" hidden>
+          <span>📄 <span id="file-name"></span></span>
+          <span class="lang-badge" id="upload-lang"></span>
+        </div>
+      </div>
+
+      <div class="action-bar">
+        <label class="llm-toggle">
+          <input type="checkbox" id="llm-toggle">
+          <span class="toggle-track"></span>
+          LLM analysis <span class="toggle-hint">(requires API key on server)</span>
+        </label>
+        <button class="btn-primary" id="deobfuscate-btn" onclick="deobfuscate()">
+          ⚡ Deobfuscate
+        </button>
+      </div>
+    </div>
+
+    <div class="output-section" id="output-section" hidden>
+      <div class="output-header">
+        <h2>Results</h2>
+        <div class="output-meta">
+          <span class="lang-badge" id="result-lang"></span>
+          <span class="steps-count" id="steps-count"></span>
+        </div>
+      </div>
+
+      <div id="steps-container"></div>
+
+      <div class="result-card" id="deobfuscated-card">
+        <div class="result-card-header">
+          <h3>Deobfuscated</h3>
+          <div class="result-actions">
+            <button class="btn-secondary" onclick="copyResult()">📋 Copy</button>
+            <button class="btn-secondary" onclick="toggleDiff()" id="diff-btn">Show diff</button>
+          </div>
+        </div>
+        <pre id="deobfuscated-output" class="code-output"></pre>
+      </div>
+
+      <div class="result-card" id="diff-card" hidden>
+        <div class="result-card-header">
+          <h3>Diff</h3>
+        </div>
+        <pre id="diff-output" class="code-output"></pre>
+      </div>
+
+      <div class="result-card" id="llm-card" hidden>
+        <div class="result-card-header">
+          <h3>🧠 LLM Analysis</h3>
+        </div>
+        <div id="llm-content"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <p><a href="https://github.com/gnaixnaij/deobfuscator">GitHub</a> · <a href="https://ko-fi.com/gnaixnaij">Sponsor</a> · by <a href="https://github.com/gnaixnaij">gnaixnaij</a></p>
+  </footer>
+
+  <script>
+    let currentFile = null;
+    let originalText = "";
+    let deobfuscatedText = "";
+
+    // Tab switching
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        document.querySelectorAll(".tab-content").forEach(tc => tc.classList.remove("active"));
+        tab.classList.add("active");
+        document.getElementById("tab-" + tab.dataset.tab).classList.add("active");
+      });
+    });
+
+    // File upload via click
+    document.getElementById("drop-zone").addEventListener("click", () => {
+      document.getElementById("file-input").click();
+    });
+
+    // Drag and drop
+    const dropZone = document.getElementById("drop-zone");
+    dropZone.addEventListener("dragover", e => {
+      e.preventDefault();
+      dropZone.classList.add("dragover");
+    });
+    dropZone.addEventListener("dragleave", () => {
+      dropZone.classList.remove("dragover");
+    });
+    dropZone.addEventListener("drop", e => {
+      e.preventDefault();
+      dropZone.classList.remove("dragover");
+      if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+
+    document.getElementById("file-input").addEventListener("change", e => {
+      if (e.target.files.length) handleFile(e.target.files[0]);
+    });
+
+    function handleFile(file) {
+      currentFile = file;
+      document.getElementById("file-name").textContent = file.name;
+      document.getElementById("file-info").hidden = false;
+      const ext = file.name.split(".").pop().toLowerCase();
+      const langMap = { ps1: "PowerShell", bas: "VBA", vbs: "VBA", js: "JavaScript" };
+      document.getElementById("upload-lang").textContent = langMap[ext] || "Unknown";
+    }
+
+    // Paste area also accepts drag/drop
+    const codeInput = document.getElementById("code-input");
+    codeInput.addEventListener("dragover", e => { e.preventDefault(); });
+    codeInput.addEventListener("drop", e => {
+      e.preventDefault();
+      if (e.dataTransfer.files.length) {
+        const reader = new FileReader();
+        reader.onload = ev => { codeInput.value = ev.target.result; };
+        reader.readAsText(e.dataTransfer.files[0]);
+      }
+    });
+
+    // Auto-detect language on input
+    let detectTimeout;
+    codeInput.addEventListener("input", () => {
+      clearTimeout(detectTimeout);
+      detectTimeout = setTimeout(autoDetect, 500);
+    });
+
+    document.getElementById("lang-override").addEventListener("change", () => {
+      const manual = document.getElementById("lang-override").value;
+      if (manual) {
+        document.getElementById("detected-lang").textContent = manual.charAt(0).toUpperCase() + manual.slice(1);
+      } else {
+        autoDetect();
+      }
+    });
+
+    async function autoDetect() {
+      const script = codeInput.value.trim();
+      if (script.length < 10) {
+        document.getElementById("detected-lang").textContent = "Auto-detect";
+        return;
+      }
+      try {
+        const r = await fetch("/api/detect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ script })
+        });
+        const d = await r.json();
+        document.getElementById("detected-lang").textContent = d.language.charAt(0).toUpperCase() + d.language.slice(1);
+      } catch { document.getElementById("detected-lang").textContent = "Auto-detect"; }
+    }
+
+    function clearEditor() {
+      codeInput.value = "";
+      currentFile = null;
+      document.getElementById("file-info").hidden = true;
+      document.getElementById("output-section").hidden = true;
+      document.getElementById("detected-lang").textContent = "Auto-detect";
+    }
+
+    async function deobfuscate() {
+      const btn = document.getElementById("deobfuscate-btn");
+      btn.disabled = true;
+      btn.textContent = "⏳ Processing...";
+      document.getElementById("output-section").hidden = true;
+
+      const formData = new FormData();
+      let script = "";
+      let filename = "";
+
+      const activeTab = document.querySelector(".tab.active").dataset.tab;
+      if (activeTab === "upload" && currentFile) {
+        formData.append("file", currentFile);
+        try {
+          const r = await fetch("/api/upload", { method: "POST", body: formData });
+          const d = await r.json();
+          renderResult(d);
+        } catch (err) {
+          showError("Upload failed: " + err.message);
+        }
+        btn.disabled = false;
+        btn.textContent = "⚡ Deobfuscate";
+        return;
+      }
+
+      script = codeInput.value;
+      if (!script.trim()) { showError("Enter or upload a script first."); btn.disabled = false; btn.textContent = "⚡ Deobfuscate"; return; }
+
+      formData.append("script", script);
+      formData.append("lang", document.getElementById("lang-override").value);
+      formData.append("use_llm", document.getElementById("llm-toggle").checked);
+
+      try {
+        const r = await fetch("/api/deobfuscate", { method: "POST", body: formData });
+        const d = await r.json();
+        if (d.error) { showError(d.error); } else { renderResult(d); }
+      } catch (err) { showError("Request failed: " + err.message); }
+
+      btn.disabled = false;
+      btn.textContent = "⚡ Deobfuscate";
+    }
+
+    function renderResult(d) {
+      originalText = document.getElementById("code-input").value || "";
+      deobfuscatedText = d.deobfuscated || "";
+
+      document.getElementById("output-section").hidden = false;
+      document.getElementById("result-lang").textContent = d.language.charAt(0).toUpperCase() + d.language.slice(1);
+      document.getElementById("steps-count").textContent = d.static_steps.length + " techniques reversed";
+
+      // Steps
+      const stepsContainer = document.getElementById("steps-container");
+      stepsContainer.innerHTML = "";
+      d.static_steps.forEach((step, i) => {
+        const el = document.createElement("div");
+        el.className = "step-item";
+        el.innerHTML = `<span class="step-check">✓</span><span>${step}</span>`;
+        stepsContainer.appendChild(el);
+      });
+
+      // Deobfuscated output
+      document.getElementById("deobfuscated-output").textContent = deobfuscatedText || "(No change — script was already clean)";
+
+      // Diff
+      if (originalText && deobfuscatedText && originalText !== deobfuscatedText) {
+        document.getElementById("diff-card").hidden = false;
+        document.getElementById("diff-output").textContent = generateDiff(originalText, deobfuscatedText);
+      } else {
+        document.getElementById("diff-card").hidden = true;
+      }
+
+      // LLM
+      const llmCard = document.getElementById("llm-card");
+      const llmContent = document.getElementById("llm-content");
+      if (d.llm) {
+        llmCard.hidden = false;
+        let html = "";
+        if (d.llm.techniques) {
+          html += "<div class='llm-section'><h4>Techniques detected</h4><ul>" +
+            d.llm.techniques.map(t => "<li>" + t + "</li>").join("") + "</ul></div>";
+        }
+        if (d.llm.summary) {
+          html += "<div class='llm-section'><h4>Summary</h4><p>" + d.llm.summary + "</p></div>";
+        }
+        if (d.llm.deobfuscated) {
+          html += "<div class='llm-section'><h4>LLM Deobfuscated</h4><pre class='code-output'>" + escapeHtml(d.llm.deobfuscated) + "</pre></div>";
+        }
+        llmContent.innerHTML = html;
+      } else if (d.llm_error) {
+        llmCard.hidden = false;
+        llmContent.innerHTML = "<p class='llm-error'>⚠️ " + d.llm_error + "</p>";
+      } else {
+        llmCard.hidden = true;
+      }
+
+      document.getElementById("deobfuscated-card").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function generateDiff(original, deobfuscated) {
+      const oLines = original.split("\n");
+      const dLines = deobfuscated.split("\n");
+      let result = "";
+      const maxLen = Math.max(oLines.length, dLines.length);
+      for (let i = 0; i < maxLen; i++) {
+        const o = oLines[i] || "";
+        const d = dLines[i] || "";
+        if (o === d) {
+          result += "  " + o + "\n";
+        } else if (o && !d) {
+          result += "- " + o + "\n";
+        } else if (!o && d) {
+          result += "+ " + d + "\n";
+        } else {
+          result += "- " + o + "\n+ " + d + "\n";
+        }
+      }
+      return result;
+    }
+
+    function toggleDiff() {
+      const card = document.getElementById("diff-card");
+      card.hidden = !card.hidden;
+      document.getElementById("diff-btn").textContent = card.hidden ? "Show diff" : "Hide diff";
+    }
+
+    function copyResult() {
+      const text = document.getElementById("deobfuscated-output").textContent;
+      navigator.clipboard.writeText(text);
+      const btn = document.querySelector(".result-actions .btn-secondary");
+      const orig = btn.textContent;
+      btn.textContent = "✅ Copied!";
+      setTimeout(() => btn.textContent = orig, 1500);
+    }
+
+    function showError(msg) {
+      document.getElementById("output-section").hidden = false;
+      document.getElementById("steps-container").innerHTML = "";
+      document.getElementById("deobfuscated-output").textContent = "⚠️ " + msg;
+    }
+
+    function escapeHtml(text) {
+      const d = document.createElement("div");
+      d.textContent = text;
+      return d.innerHTML;
+    }
+  </script>
+</body>
+</html>
