@@ -1,10 +1,6 @@
 import os
-import sys
-import tempfile
 
 from flask import Flask, render_template, request, jsonify
-
-sys.path.insert(0, os.path.expanduser("~/ai-deobfuscator"))
 from deobfuscator.core import analyze, detect_language
 from deobfuscator.llm.deobfuscate import deobfuscate_with_llm
 
