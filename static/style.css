@@ -315,6 +315,44 @@ main {
 .llm-section p { color: var(--text-muted); }
 .llm-error { color: var(--orange); }
 
+/* IOC grid */
+.ioc-grid { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.ioc-section h4 { font-size: 0.85em; margin-bottom: 6px; color: var(--text-muted); }
+.ioc-item {
+  display: inline-block;
+  padding: 4px 10px;
+  margin: 3px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8em;
+  border: 1px solid var(--border);
+}
+.ioc-url { background: #d9a20022; color: #d9a200; border-color: #d9a20044; }
+.ioc-ip { background: #f8514922; color: #f85149; border-color: #f8514944; }
+.ioc-domain { background: #58a6ff22; color: #58a6ff; border-color: #58a6ff44; }
+.ioc-email { background: #8250df22; color: #8250df; border-color: #8250df44; }
+.ioc-filepath { background: #3fb95022; color: #3fb950; border-color: #3fb95044; }
+.ioc-registry { background: #d2992222; color: #d29922; border-color: #d2992244; }
+.ioc-hash { background: #8b949e22; color: #8b949e; border-color: #8b949e44; }
+
+/* Result tabs */
+.result-tabs { display: flex; gap: 2px; }
+.result-tab {
+  padding: 6px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85em;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+.result-tab:hover { color: var(--text); }
+.result-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.detection-tab-content { border-top: 1px solid var(--border); }
+.detection-tab-content .code-output { max-height: 600px; }
+
 /* Footer */
 footer {
   text-align: center;

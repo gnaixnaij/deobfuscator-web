@@ -105,6 +105,24 @@
         </div>
         <div id="llm-content"></div>
       </div>
+
+      <div class="result-card" id="ioc-card" hidden>
+        <div class="result-card-header">
+          <h3>🔍 Indicators of Compromise</h3>
+        </div>
+        <div id="ioc-content"></div>
+      </div>
+
+      <div class="result-card" id="detection-card" hidden>
+        <div class="result-card-header">
+          <div class="result-tabs">
+            <button class="result-tab active" data-rtab="sigma" onclick="switchResultTab('sigma')">Sigma Rules</button>
+            <button class="result-tab" data-rtab="yara" onclick="switchResultTab('yara')">YARA Rule</button>
+          </div>
+          <button class="btn-secondary" onclick="copyDetection()">📋 Copy all</button>
+        </div>
+        <div id="detection-content"></div>
+      </div>
     </div>
   </main>
 
@@ -253,6 +271,18 @@
 
       btn.disabled = false;
       btn.textContent = "⚡ Deobfuscate";
+
+      // IOC extraction
+      const deobfuscatedScript = d.deobfuscated || script;
+      try {
+        const iocR = await fetch("/api/analyze-iocs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ script: deobfuscatedScript })
+        });
+        const iocD = await iocR.json();
+        renderIOCs(iocD);
+      } catch {}
     }
 
     function renderResult(d) {
@@ -342,6 +372,97 @@
       const text = document.getElementById("deobfuscated-output").textContent;
       navigator.clipboard.writeText(text);
       const btn = document.querySelector(".result-actions .btn-secondary");
+      const orig = btn.textContent;
+      btn.textContent = "✅ Copied!";
+      setTimeout(() => btn.textContent = orig, 1500);
+    }
+
+    function renderIOCs(d) {
+      const iocCard = document.getElementById("ioc-card");
+      const detectionCard = document.getElementById("detection-card");
+      const iocContent = document.getElementById("ioc-content");
+      const detectionContent = document.getElementById("detection-content");
+
+      if (!d.has_iocs) { iocCard.hidden = true; detectionCard.hidden = true; return; }
+
+      iocCard.hidden = false;
+      const iocs = d.iocs;
+      let html = '<div class="ioc-grid">';
+
+      if (iocs.urls && iocs.urls.length) {
+        html += '<div class="ioc-section"><h4>🌐 URLs</h4>' +
+          iocs.urls.map(u => '<div class="ioc-item ioc-url">' + escapeHtml(u) + '</div>').join("") + '</div>';
+      }
+      if (iocs.ips && iocs.ips.length) {
+        html += '<div class="ioc-section"><h4>📡 IPs</h4>' +
+          iocs.ips.map(ip => '<div class="ioc-item ioc-ip">' + escapeHtml(ip) + '</div>').join("") + '</div>';
+      }
+      if (iocs.domains && iocs.domains.length) {
+        html += '<div class="ioc-section"><h4>🌍 Domains</h4>' +
+          iocs.domains.map(d => '<div class="ioc-item ioc-domain">' + escapeHtml(d) + '</div>').join("") + '</div>';
+      }
+      if (iocs.emails && iocs.emails.length) {
+        html += '<div class="ioc-section"><h4>📧 Emails</h4>' +
+          iocs.emails.map(e => '<div class="ioc-item ioc-email">' + escapeHtml(e) + '</div>').join("") + '</div>';
+      }
+      if (iocs.filepaths && iocs.filepaths.length) {
+        html += '<div class="ioc-section"><h4>📁 File Paths</h4>' +
+          iocs.filepaths.map(f => '<div class="ioc-item ioc-filepath">' + escapeHtml(f) + '</div>').join("") + '</div>';
+      }
+      if (iocs.registry_keys && iocs.registry_keys.length) {
+        html += '<div class="ioc-section"><h4>📋 Registry Keys</h4>' +
+          iocs.registry_keys.map(r => '<div class="ioc-item ioc-registry">' + escapeHtml(r) + '</div>').join("") + '</div>';
+      }
+      if (iocs.hashes) {
+        const allHashes = [...iocs.hashes.md5 || [], ...iocs.hashes.sha1 || [], ...iocs.hashes.sha256 || []];
+        if (allHashes.length) {
+          html += '<div class="ioc-section"><h4>🔑 Hashes</h4>' +
+            allHashes.map(h => '<div class="ioc-item ioc-hash">' + escapeHtml(h) + '</div>').join("") + '</div>';
+        }
+      }
+
+      html += '</div>';
+      iocContent.innerHTML = html;
+
+      // Detection rules
+      detectionCard.hidden = false;
+      let detHtml = '';
+
+      if (d.sigma_rules && d.sigma_rules.length) {
+        d.sigma_rules.forEach((r, i) => {
+          detHtml += `<div class="detection-tab-content" id="dtab-sigma-${i}" style="display:${i === 0 ? '' : 'none'}"><pre class="code-output">${escapeHtml(r.rule)}</pre></div>`;
+        });
+      }
+
+      if (d.yara_rule) {
+        detHtml += `<div class="detection-tab-content" id="dtab-yara" style="display:none"><pre class="code-output">${escapeHtml(d.yara_rule)}</pre></div>`;
+      }
+
+      if (!detHtml) {
+        detHtml = '<p style="padding:16px;color:var(--text-muted)">No detection rules generated.</p>';
+      }
+
+      detectionContent.innerHTML = detHtml;
+    }
+
+    function switchResultTab(tab) {
+      document.querySelectorAll(".result-tab").forEach(t => t.classList.remove("active"));
+      document.querySelector(`.result-tab[data-rtab="${tab}"]`).classList.add("active");
+      document.querySelectorAll(".detection-tab-content").forEach(c => c.style.display = "none");
+      if (tab === "sigma") {
+        document.getElementById("dtab-sigma-0").style.display = "";
+      } else if (tab === "yara") {
+        document.getElementById("dtab-yara").style.display = "";
+      }
+    }
+
+    function copyDetection() {
+      let text = "";
+      document.querySelectorAll(".detection-tab-content .code-output").forEach(el => {
+        text += el.textContent + "\n---\n";
+      });
+      navigator.clipboard.writeText(text.trim());
+      const btn = document.querySelector("#detection-card .btn-secondary");
       const orig = btn.textContent;
       btn.textContent = "✅ Copied!";
       setTimeout(() => btn.textContent = orig, 1500);

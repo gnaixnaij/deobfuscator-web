@@ -3,6 +3,9 @@ import os
 from flask import Flask, render_template, request, jsonify
 from deobfuscator.core import analyze, detect_language
 from deobfuscator.llm.deobfuscate import deobfuscate_with_llm
+from ioc.extract import extract_iocs
+from ioc.sigma import generate_sigma
+from ioc.yara import generate_yara
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
@@ -92,6 +95,27 @@ def upload():
         "deobfuscated": result.get("deobfuscated", ""),
         "changed": result.get("deobfuscated", "").strip() != script.strip(),
     })
+
+@app.route("/api/analyze-iocs", methods=["POST"])
+def analyze_iocs():
+    data = request.get_json()
+    script = data.get("script", "")
+    if not script.strip():
+        return jsonify({"error": "No script provided"}), 400
+
+    iocs = extract_iocs(script)
+    sigma_rules = generate_sigma(iocs)
+    yara_rule = generate_yara(iocs)
+
+    has_iocs = any(v for k, v in iocs.items() if k != "base64_strings" for v in (v if isinstance(v, list) else v.values()))
+
+    return jsonify({
+        "iocs": iocs,
+        "has_iocs": bool(has_iocs),
+        "sigma_rules": [{"title": t, "rule": r} for t, r in sigma_rules],
+        "yara_rule": yara_rule,
+    })
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
