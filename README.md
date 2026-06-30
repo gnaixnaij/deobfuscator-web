@@ -35,11 +35,22 @@
 
 ## 🖥 Run locally
 
+### Python
+
 ```bash
 git clone git@github.com:gnaixnaij/deobfuscator-web.git
 cd deobfuscator-web
 pip install -r requirements.txt
+cp .env.example .env  # Edit with your OpenAI key (optional)
 python app.py
+# Open http://localhost:5000
+```
+
+### Docker
+
+```bash
+docker build -t deobfuscator-web .
+docker run -p 5000:5000 -e OPENAI_API_KEY=sk-... deobfuscator-web
 # Open http://localhost:5000
 ```
 
