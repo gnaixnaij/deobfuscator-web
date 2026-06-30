@@ -11,6 +11,9 @@
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License">
   </a>
+  <a href="https://github.com/gnaixnaij/deobfuscator-web/actions">
+    <img src="https://img.shields.io/github/actions/workflow/status/gnaixnaij/deobfuscator-web/lint.yml?branch=main&label=CI&logo=github&style=for-the-badge" alt="CI">
+  </a>
 </div>
 
 ---
