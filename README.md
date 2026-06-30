@@ -13,6 +13,7 @@
   </a>
   <a href="https://github.com/gnaixnaij/deobfuscator-web/actions">
     <img src="https://img.shields.io/github/actions/workflow/status/gnaixnaij/deobfuscator-web/lint.yml?branch=main&label=CI&logo=github&style=for-the-badge" alt="CI">
+[![Release](https://img.shields.io/github/v/release/gnaixnaij/deobfuscator-web?logo=github)](https://github.com/gnaixnaij/deobfuscator-web/releases)
   </a>
 </div>
 
