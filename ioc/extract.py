@@ -61,7 +61,16 @@ def _extract_domains(text):
         text
     )
     excludes = {"example.com", "test.com", "domain.com", "localhost"}
-    return [d for d in domains if d.lower() not in excludes]
+    exts = {".exe",".dll",".ps1",".zip",".tar",".gz",".pdf",".doc",".docx",
+            ".xls",".xlsx",".ppt",".pptx",".jpg",".png",".gif",".svg",".ico",
+            ".html",".htm",".css",".js",".py",".rb",".go",".rs",".sh",".bat"}
+    result = []
+    for d in domains:
+        dl = d.lower()
+        if dl in excludes: continue
+        if any(dl.endswith(e) for e in exts): continue
+        result.append(d)
+    return result
 
 
 def _extract_urls(text):
@@ -81,10 +90,14 @@ def _extract_emails(text):
 
 
 def _extract_filepaths(text):
-    paths = []
-    paths.extend(re.findall(r'(?:[Cc]:\\|/)[^\s"\'<>\[\]]+(?:\.\w+)?', text))
-    paths = [p for p in paths if len(p) > 5]
-    return paths
+    paths = re.findall(r'(?:[Cc]:\\|/)[^\s"\'<>\[\]]+(?:\.\w+)?', text)
+    result = []
+    for p in paths:
+        if len(p) <= 5: continue
+        if p.startswith("//"): continue
+        if p.startswith("/") and p.count("/") == 1: continue
+        result.append(p)
+    return result
 
 
 def _extract_registry(text):
