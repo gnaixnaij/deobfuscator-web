@@ -30,17 +30,44 @@ def detect_language(script, hint=None):
             return LANG_ALIASES[hint.lstrip(".")]
 
     lines = script.strip().split('\n')
-    for line in lines[:5]:
-        if line.strip().lower().startswith(('function ', 'sub ', 'end sub', 'end function', 'dim ', 'attribute ')):
-            return "vba"
-        if '$' in line and any(kw in line.lower() for kw in ['iex', 'invoke', 'write-host', 'get-']):
-            return "powershell"
-        if 'function ' in line.lower() and '{' in line:
-            return "javascript"
+    first_lines = [l.strip() for l in lines[:8] if l.strip()]
 
-    ps_score = sum(1 for kw in ['$', '|', '-e ', '-enc ', 'iex', 'invoke-expression'] if kw in script.lower())
-    vba_score = sum(1 for kw in ['sub ', 'function ', 'dim ', 'set ', 'chrw', 'chrd'] if kw.lower() in script.lower())
-    js_score = sum(1 for kw in ['function(', 'var ', 'let ', 'const ', 'eval(', 'document'] if kw in script.lower())
+    # Check for strong PowerShell signals first
+    ps_signals = 0
+    for line in first_lines:
+        if '$' in line and any(kw in line.lower() for kw in ['iex', 'invoke', 'write-host', 'get-', '-enc', 'frombase64']):
+            ps_signals += 2
+        if line.startswith('function ') and '$' in line:
+            ps_signals += 1
+    if ps_signals >= 2:
+        return "powershell"
+
+    # Check for strong VBA signals
+    vba_signals = 0
+    for line in first_lines:
+        if line.lower().startswith(('sub ', 'end sub', 'end function', 'dim ', 'attribute ')):
+            vba_signals += 2
+        if 'chrw(' in line.lower() or 'chrd(' in line.lower() or 'chr(' in line.lower():
+            vba_signals += 1
+    if vba_signals >= 2:
+        return "vba"
+
+    # Check for strong JavaScript signals
+    js_signals = 0
+    for line in first_lines:
+        if 'function ' in line.lower() and '{' in line and '$' not in line:
+            js_signals += 2
+        if line.startswith(('var ', 'let ', 'const ')):
+            js_signals += 2
+        if 'eval(' in line.lower() or 'atob(' in line.lower():
+            js_signals += 1
+    if js_signals >= 2:
+        return "javascript"
+
+    # Scoring fallback
+    ps_score = sum(1 for kw in ['$', '|', '-e ', '-enc ', 'iex'] if kw in script.lower())
+    vba_score = sum(1 for kw in ['sub ', 'dim ', 'set ', 'chrw', 'chrd', 'vbhide'] if kw.lower() in script.lower())
+    js_score = sum(1 for kw in ['var ', 'let ', 'const ', 'eval(', 'document', 'atob('] if kw in script.lower())
 
     scores = [("powershell", ps_score), ("vba", vba_score), ("javascript", js_score)]
     best = max(scores, key=lambda x: x[1])
